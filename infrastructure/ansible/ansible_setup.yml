@@ -1,0 +1,256 @@
+# This playbook configures an Ubuntu server to act as a development environment for the Airmee SDKs
+---
+-   name: 'Do basic startup and configuration tasks'
+    hosts: all
+    become: true
+    become_user: root
+    connection: local
+    vars:
+        infrastructure_directory: '/vagrant/infrastructure'
+        application_directory: '/vagrant'
+        users:
+          - 'spoole'
+        apache_vhosts:
+          - 'sphinx'
+
+    tasks:
+  
+    ##########################################################################################################
+    ## BASIC CONFIGURATION
+    ##########################################################################################################
+      
+      - name: "Set the server's hostname"
+        hostname: 
+            name: 'airmeesdk'
+
+    ##########################################################################################################
+    ## ADMIN USERS
+    ##########################################################################################################
+
+      - name: 'Create a group for the admin users'
+        group:
+            name: '{{item | basename | splitext | first}}'
+            state: present
+        with_fileglob:
+          - "{{infrastructure_directory}}/ansible/authorized_keys/*.azk"
+
+      - name: 'Create admin users'
+        user: 
+            name: '{{item | basename | splitext | first}}'
+            shell: '/bin/bash'
+            groups: '{{item | basename | splitext | first}}'
+            append: yes
+        with_fileglob:
+          - "{{infrastructure_directory}}/ansible/authorized_keys/*.azk"
+
+      - name: 'Add admin users to sudoers file'
+        lineinfile:
+            dest: '/etc/sudoers'
+            state: present
+            line: '{{item | basename | splitext | first}} ALL=(ALL:ALL) NOPASSWD:ALL'
+        with_fileglob:
+          - "{{infrastructure_directory}}/ansible/authorized_keys/*.azk"
+
+      - name: 'Create .ssh directory for admin users'
+        file:
+            path: '/home/{{item | basename | splitext | first}}/.ssh'
+            state: directory
+            owner: '{{item | basename | splitext | first}}'
+            group: '{{item | basename | splitext | first}}'
+            mode: 0700
+        with_fileglob:
+          - "{{infrastructure_directory}}/ansible/authorized_keys/*.azk"
+
+      - name: 'Install SSH public key'
+        copy:
+            src: '{{item}}'
+            dest: '/home/{{item | basename | splitext | first}}/.ssh/authorized_keys'
+            owner: '{{item | basename | splitext | first}}'
+            group: '{{item | basename | splitext | first}}'
+            mode: '0700'
+        with_fileglob:
+          - "{{infrastructure_directory}}/ansible/authorized_keys/*.azk"
+
+    ##########################################################################################################
+    ## APACHE
+    ##########################################################################################################
+
+      - name: 'Install Apache'
+        apt:
+            name: '{{item}}'
+            state: latest
+        with_items:
+          - 'apache2'
+        notify:
+          - restart_apache
+
+      - name: 'Enable Apache modules'
+        apache2_module:
+            name: '{{item}}'
+            state: present
+        with_items:
+          - 'rewrite'
+          - 'headers'
+        notify:
+          - restart_apache
+
+      - name: 'Create an apache group'
+        group:
+            name: 'apache'
+            state: present
+
+      - name: 'Create a user for the apache server'
+        user:
+            name: 'apache'
+            shell: '/bin/bash'
+            groups: 'apache'
+            append: yes
+
+      - name: 'Empty the default ports.conf file, we specify our Listen directives in each virtual host'
+        copy:
+            content: ''
+            dest: '/etc/apache2/ports.conf'
+            owner: 'root'
+            group: 'root'
+            mode: 0644
+        notify:
+          - restart_apache
+
+      - name: 'Remove the default vhost configuration'
+        file:
+            dest: '/etc/apache2/sites-enabled/000-default.conf'
+            state: absent
+        notify:
+          - restart_apache
+
+      - name: 'Copy Apache vhost config files'
+        copy:
+            src: '{{infrastructure_directory}}/ansible/vhosts/{{item}}.vhost'
+            dest: '/etc/apache2/sites-available/{{item}}.conf'
+            owner: 'root'
+            group: 'root'
+            mode: 0644
+        with_items: '{{apache_vhosts}}'
+        notify:
+          - restart_apache
+
+      - name: 'Enable vhosts'
+        file:
+            src: '/etc/apache2/sites-available/{{item}}.conf'
+            dest: '/etc/apache2/sites-enabled/010-{{item}}.conf'
+            state: link
+        with_items: '{{apache_vhosts}}'
+        notify:
+          - restart_apache
+
+      - name: 'Ensure Apache is running'
+        service:
+            name: 'apache2'
+            state: running
+
+    ##########################################################################################################
+    ## PHP
+    ##########################################################################################################
+
+      - name: 'Install PHP and supporting packages'
+        apt:
+            name: '{{item}}'
+            state: latest
+        with_items:
+          - 'php7.0'
+          - 'libapache2-mod-php7.0'
+        notify:
+          - restart_apache
+
+      - name: 'Enable PHP7 module in Apache'
+        apache2_module:
+            state: present
+            name: 'php7.0'
+        notify:
+          - restart_apache
+
+    ##########################################################################################################
+    ## COMPOSER
+    ##########################################################################################################
+
+      - name: 'Install supporting packages'
+        apt:
+            name: '{{item}}'
+            state: latest
+        with_items:
+          - 'curl'
+          - 'php-dom'
+          - 'php-cli'
+          - 'php-mbstring'
+          - 'git'
+          - 'unzip'
+
+      - name: 'Download Composer'
+        get_url:
+            url: 'https://getcomposer.org/installer'
+            dest: '/tmp/installer'
+
+      - name: 'Install Composer'
+        shell: 'cat /tmp/installer | php -- --install-dir=/usr/local/bin'
+        args:
+            creates: '/usr/local/bin/composer'
+
+      - name: 'Rename composer.phar to Composer'
+        shell: 'mv /usr/local/bin/composer.phar /usr/local/bin/composer'
+        args:
+            creates: '/usr/local/bin/composer'
+
+      - name: 'Make composer executable'
+        file:
+            path: '/usr/local/bin/composer'
+            mode: 'a+x'
+            state: file
+
+    ##########################################################################################################
+    ## DOCUMENTATION
+    ##########################################################################################################
+
+      - name: 'Install supporting packages'
+        apt:
+            name: '{{item}}'
+            state: latest
+        with_items:
+          - 'python-pip'
+
+      - name: 'Install sphinx via pip'
+        pip:
+            name: '{{item}}'
+            state: latest
+        with_items:
+          - 'sphinx'
+          - 'sphinx_rtd_theme'
+          - 'sphinxcontrib-phpdomain'
+
+      # Build documentation files
+      - name: 'Build Sphinx documentation'
+        command: 'sphinx-build -E -a -b html . _build/html'
+        args:
+          chdir: '{{application_directory}}/documentation/'
+        become: false
+
+    ##########################################################################################################
+    ## DEVELOPMENT SCRIPTS
+    ##########################################################################################################
+
+      # Downloads and installs Composer dependencies
+      - composer:
+            command: install
+            working_dir: '{{application_directory}}/'
+            no_dev: false
+        become: false
+
+    ##########################################################################################################
+    ## HANDLERS
+    ##########################################################################################################
+
+    handlers:
+      - name: 'restart_apache'
+        service:
+            name: 'apache2'
+            state: restarted
+

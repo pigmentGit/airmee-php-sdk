@@ -1,0 +1,4 @@
+/vagrant/.vagrant/*
+/vagrant/*.log
+/ansible/ansible_setup.retry
+/ansible/authorized_keys/*.azk

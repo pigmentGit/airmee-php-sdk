@@ -1,0 +1,17 @@
+Listen 81
+
+<VirtualHost *:81>
+	DocumentRoot "/vagrant/documentation/_build/html"
+	ServerName docs.airmee.com
+	
+	LogFormat "%t    \"%r\" %>s %b common
+	CustomLog /var/log/apache2/access.log common
+	ErrorLog /var/log/apache2/error.log
+	ErrorLogFormat "%t    %M"
+
+	<Directory "/vagrant/documentation/_build/html">
+	    Require all granted
+		AllowOverride All 
+	</Directory>
+		
+</VirtualHost>

@@ -1,0 +1,6 @@
+/_build/doctrees/*
+/_build/html/*
+!/_build/html/empty
+/_static
+!/_static/empty
+/_templates

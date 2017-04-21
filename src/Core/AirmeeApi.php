@@ -160,6 +160,9 @@ class AirmeeApi
 
     /**
      * Get the delivery Schedules that could be offered to the customer
+     *
+     * @depreciated deliveryIntervalsForAddress is preferred and makes additional address details optional for validation.
+     *
      * @param string $placeId
      * @param Address $address
      * @return Schedule[]
@@ -170,18 +173,47 @@ class AirmeeApi
      */
     public function deliveryIntervalsForZipCode($placeId, Address $address)
     {
+        // Only the zip code and country is passed on to maintain compatibility.
+        $zipOnlyAddress = new Address($address->getZipCode(), $address->getCountryCode());
+
+        return $this->deliveryIntervalsForAddress($placeId, $zipOnlyAddress);
+    }
+
+    /**
+     * Get the delivery Schedules that could be offered to the customer
+     * @param string $placeId
+     * @param Address $address
+     * @return Schedule[]
+     * @throws AuthorizationException
+     * @throws UnknownPlaceException
+     * @throws InvalidArgumentException
+     * @throws ServerErrorException
+     */
+    public function deliveryIntervalsForAddress($placeId, Address $address)
+    {
         if (empty($placeId)) {
             throw new InvalidArgumentException('$placeId must be specified');
         }
 
         try {
+            $query = [
+                'place_id' => $placeId,
+                'country' => $address->getCountryCode(),
+                'zip_code' => $address->getZipCode()
+
+            ];
+
+            if($address->getStreetAndNumber() && $address->getCity()) {
+                $streetAndNumberAndCity = [
+                    'street_and_number' => $address->getStreetAndNumber(),
+                    'city' => $address->getCity()
+                ];
+                $query = array_merge($query, $streetAndNumberAndCity);
+            }
+
             $response = $this->getGuzzleClient()->get($this->getTargetUri('delivery_intervals_for_zip_code'), [
                 'headers' => ['Authorization' => $this->getJwtToken($placeId)],
-                'query' => [
-                    'place_id' => $placeId,
-                    'zip_code' => $address->getZipCode(),
-                    'country' => $address->getCountryCode()
-                ]
+                'query' => $query
             ]);
 
             $responseObject = json_decode($response->getBody(), true);

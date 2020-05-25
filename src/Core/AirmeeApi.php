@@ -199,8 +199,9 @@ class AirmeeApi
             $query = [
                 'place_id' => $placeId,
                 'country' => $address->getCountryCode(),
-                'zip_code' => $address->getZipCode()
-
+                'zip_code' => $address->getZipCode(),
+                'date' => $this->getDate(),
+                'offset' => '120'
             ];
 
             if($address->getStreetAndNumber() && $address->getCity()) {
@@ -211,7 +212,7 @@ class AirmeeApi
                 $query = array_merge($query, $streetAndNumberAndCity);
             }
 
-            $response = $this->getGuzzleClient()->get($this->getTargetUri('delivery_intervals_for_zip_code'), [
+            $response = $this->getGuzzleClient()->get($this->getTargetUri('checkout_delivery_intervals_for_zip_code'), [
                 'headers' => ['Authorization' => $this->getJwtToken($placeId)],
                 'query' => $query
             ]);
@@ -237,6 +238,15 @@ class AirmeeApi
                     throw new ServerErrorException($errorMessage, 500, $e);
             }
         }
+    }
+
+    public function getDate()
+    {
+        date_default_timezone_set("Europe/Stockholm");
+        $startTime = date("Y-m-d H:i");
+        $offset = '120';
+        $date = date('Y-m-d H:i',strtotime('+' . $offset . 'minutes',strtotime($startTime)));
+        return $date;
     }
 
     /**

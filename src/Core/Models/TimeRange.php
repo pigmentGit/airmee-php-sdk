@@ -7,7 +7,6 @@
 
 namespace Airmee\PhpSdk\Core\Models;
 
-
 use Airmee\PhpSdk\Core\Exceptions\InvalidArgumentException;
 
 class TimeRange
@@ -21,17 +20,22 @@ class TimeRange
     /** @var string */
     private $formatted;
 
+    /** @var \DateTimeZone */
+    private $timezone;
+
     /**
      * TimeRange constructor.
      * @param int|string|\DateTime $start
      * @param int|string|\DateTime $end
+     * @param string $timezone
      * @param string $formatted
      * @throws \Airmee\PhpSdk\Core\Exceptions\InvalidArgumentException
      */
-    public function __construct($start, $end, $formatted = null)
+    public function __construct($start, $end, $formatted = null, $timezone = null)
     {
         $this->start = $this->validateDatetime($start, '$start');
         $this->end = $this->validateDatetime($end, '$end');
+        $this->timezone = $this->validateTimezone($timezone);
 
         if ($this->end <= $this->start) {
             throw new InvalidArgumentException('$start must be before $end');
@@ -62,6 +66,8 @@ class TimeRange
             }
             try {
                 $ret = new \DateTime($datetime);
+                $ret->setTimezone($this->timezone);
+
                 $errors = \DateTime::getLastErrors();
                 if (!empty($errors['warning_count'])) {
                     throw new InvalidArgumentException("$parameterName must be a valid parameter to DateTime($parameterName)", 0);
@@ -71,6 +77,22 @@ class TimeRange
                 throw new InvalidArgumentException("$parameterName must be a valid parameter to DateTime($parameterName)", 0, $e);
             }
         }
+    }
+
+    /**
+     * Generate a DateTimeZone from a mixed input
+     *
+     * @param null|\DateTimeZone $timezone If null, use the default timezone 'Europe/Stockholm'
+     * @return \DateTimeZone
+     */
+    public function validateTimezone($timezone)
+    {
+        if (empty($timezone)) {
+            $timezone = new \DateTimeZone('Europe/Stockholm');
+        } elseif ($timezone instanceof \DateTimeZone) {
+            return $timezone;
+        }
+        return $timezone;
     }
 
     /**
@@ -98,5 +120,15 @@ class TimeRange
     public function getFormatted()
     {
         return $this->formatted;
+    }
+
+    /**
+     * Get the timezone
+     *
+     * @return \DateTimeZone
+     */
+    public function getTimezone()
+    {
+        return $this->timezone;
     }
 }

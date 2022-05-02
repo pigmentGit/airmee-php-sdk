@@ -106,8 +106,7 @@ class AirmeeApi
         if ($this->isSandbox()) {
             if (array_key_exists('endpoint.sandbox', $config)) {
                 $this->endpoint = $config['endpoint.sandbox'];
-            }
-            else {
+            } else {
                 $this->endpoint = 'https://staging-api.airmee.com/integration';
             }
         } else {
@@ -203,7 +202,7 @@ class AirmeeApi
 
             ];
 
-            if($address->getStreetAndNumber() && $address->getCity()) {
+            if ($address->getStreetAndNumber() && $address->getCity()) {
                 $streetAndNumberAndCity = [
                     'street_and_number' => $address->getStreetAndNumber(),
                     'city' => $address->getCity()
@@ -222,7 +221,6 @@ class AirmeeApi
             }
 
             return array_map([self::class, 'buildSchedule'], $responseObject['list_of_schedules']);
-
         } catch (BadResponseException $e) {
             $errorMessage = self::buildErrorMessage($e->getResponse()->GetBody());
 
@@ -270,7 +268,6 @@ class AirmeeApi
             }
 
             return self::buildItem($responseObject['threshold_values']);
-
         } catch (BadResponseException $e) {
             $errorMessage = self::buildErrorMessage($e->getResponse()->GetBody());
 
@@ -342,6 +339,7 @@ class AirmeeApi
                     'items' => array_map(
                         function (Item $item) {
                             return [
+                                'parcel_id' => $item->getParcelId(),
                                 'length' => $item->getLength(),
                                 'width' => $item->getWidth(),
                                 'height' => $item->getHeight(),
@@ -373,7 +371,6 @@ class AirmeeApi
             }
 
             return self::buildOrder($responseObject['order']);
-
         } catch (BadResponseException $e) {
             $errorMessage = self::buildErrorMessage($e->getResponse()->GetBody());
 
@@ -442,13 +439,14 @@ class AirmeeApi
      */
     private static function buildItem(array $element)
     {
-        foreach(['length', 'width', 'height', 'weight'] as $param){
+        foreach (['length', 'width', 'height', 'weight'] as $param) {
             if (!array_key_exists($param, $element) || !is_numeric($element[$param])) {
                 throw new ServerErrorException('A server error occurred', 500);
             }
         }
 
         return new Item(
+            $element['parcel_id'],
             $element['length'],
             $element['width'],
             $element['height'],

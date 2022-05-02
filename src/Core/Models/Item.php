@@ -7,7 +7,6 @@
 
 namespace Airmee\PhpSdk\Core\Models;
 
-
 use Airmee\PhpSdk\Core\Exceptions\InvalidArgumentException;
 use Money\Money;
 
@@ -19,6 +18,9 @@ class Item
 {
     /** @var string */
     private $length;
+
+    /** @var string */
+    private $parcel_id;
 
     /** @var string */
     private $width;
@@ -40,17 +42,23 @@ class Item
 
     /**
      * Item constructor.
-     * @param int $length The length of the item in centimetres
-     * @param int $width  The width of the item in centimetres
-     * @param int $height The height of the item in centimetres
+     * @param string $parcel_id Unique identifier for item
+     * @param int $length The length of the item in centimeters
+     * @param int $width  The width of the item in centimeters
+     * @param int $height The height of the item in centimeters
      * @param int $weight The weight of the item in grams
      * @param Money $value  The unit price of the item
      * @param string $name   The name of the item
      * @param int $quantity The number of items of this type in the delivery
      * @throws InvalidArgumentException
      */
-    public function __construct($length, $width, $height, $weight, Money $value, $name, $quantity = 1)
+    public function __construct($parcel_id, $length, $width, $height, $weight, Money $value, $name, $quantity = 1)
     {
+        if (empty($parcel_id)) {
+            throw new InvalidArgumentException('$parcel_id parameter is required');
+        }
+        $this->parcel_id = $parcel_id;
+
         if (empty($length)) {
             throw new InvalidArgumentException('$length parameter is required');
         }
@@ -90,6 +98,15 @@ class Item
     public function getLength()
     {
         return $this->length;
+    }
+
+    /**
+     * Get the parcel id
+     * @return int
+     */
+    public function getParcelId()
+    {
+        return $this->parcel_id;
     }
 
     /**

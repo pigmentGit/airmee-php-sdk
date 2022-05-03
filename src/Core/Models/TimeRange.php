@@ -33,9 +33,9 @@ class TimeRange
      */
     public function __construct($start, $end, $formatted = null, $timezone = null)
     {
+        $this->timezone = $this->validateTimezone($timezone);
         $this->start = $this->validateDatetime($start, '$start');
         $this->end = $this->validateDatetime($end, '$end');
-        $this->timezone = $this->validateTimezone($timezone);
 
         if ($this->end <= $this->start) {
             throw new InvalidArgumentException('$start must be before $end');
